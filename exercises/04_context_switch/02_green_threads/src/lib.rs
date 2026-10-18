@@ -14,9 +14,11 @@
 //! The scheduler round-robins among ready threads. User entry is wrapped by `thread_wrapper`, which
 //! calls the entry then marks the thread `Finished` and switches back.
 
-#![cfg(target_arch = "riscv64")]
-
+// #![cfg(target_arch = "riscv64")]
 use core::arch::naked_asm;
+use std::{ops::Deref, ptr::null_mut};
+
+use crate::ThreadState::{Finished, Ready, Running};
 
 /// Per-thread stack size. Slightly larger to avoid overflow under QEMU / test harness.
 const STACK_SIZE: usize = 1024 * 128;
@@ -48,10 +50,25 @@ pub enum ThreadState {
     Finished,
 }
 
+#[repr(align(16))]
+struct Stack([u8;STACK_SIZE]);
+
+struct AlignStack(Box<Stack>);
+
+impl AlignStack{
+    fn new() -> Self {
+        Self ( Box::new(Stack([0;STACK_SIZE])))
+    }
+
+    fn as_ptr(&self) -> *const u8{
+        self.0.deref() as *const Stack as *const u8
+    }
+}
+
 struct GreenThread {
     ctx: TaskContext,
     state: ThreadState,
-    _stack: Option<Vec<u8>>,
+    _stack: Option<AlignStack>,
     /// User entry; taken once when the thread is first scheduled and passed to `thread_wrapper`.
     entry: Option<extern "C" fn()>,
 }
@@ -74,7 +91,7 @@ extern "C" fn thread_wrapper() {
 ///
 /// Must be `#[unsafe(naked)]` to prevent the compiler from generating a prologue/epilogue.
 #[unsafe(naked)]
-unsafe extern "C" fn switch_context(_old: &mut TaskContext, _new: &TaskContext) {
+unsafe extern "C" fn switch_context(_old: *mut TaskContext, _new: *const TaskContext) {
     naked_asm!(
         "sd sp, 0(a0)",
         "sd ra, 8(a0)",
@@ -137,7 +154,25 @@ impl Scheduler {
     ///    `sp` must be 16-byte aligned (e.g. `(stack_top - 16) & !15` to leave headroom).
     /// 3. Push a `GreenThread` with this context, state `Ready`, and `entry` stored for the wrapper to call.
     pub fn spawn(&mut self, entry: extern "C" fn()) {
-        todo!("alloc stack, init ctx with ra=thread_wrapper and aligned sp, push GreenThread(Ready, entry)")
+        // todo!("alloc stack, init ctx with ra=thread_wrapper and aligned sp, push GreenThread(Ready, entry)")
+        let stack = AlignStack::new();
+        let ctx = TaskContext{
+            sp: unsafe {stack.as_ptr().byte_add(STACK_SIZE) as u64},
+            ra: thread_wrapper as *const () as u64,
+            s0: 0,
+            s1: 0,
+            s2: 0,
+            s3: 0,
+            s4: 0,
+            s5: 0,
+            s6: 0,
+            s7: 0,
+            s8: 0,
+            s9: 0,
+            s10: 0,
+            s11: 0,
+        };
+        self.threads.push(GreenThread { ctx, state: Ready, _stack: Some(stack), entry: Some(entry) });
     }
 
     /// Run the scheduler until all threads (except the main one) are `Finished`.
@@ -146,12 +181,48 @@ impl Scheduler {
     /// 2. Loop: if all threads in `threads[1..]` are `Finished`, break; otherwise call `schedule_next()` (which may switch away and later return).
     /// 3. Clear `SCHEDULER` when done.
     pub fn run(&mut self) {
-        todo!("set SCHEDULER to self, loop until threads[1..] all Finished, call schedule_next, then clear SCHEDULER")
+        // todo!("set SCHEDULER to self, loop until threads[1..] all Finished, call schedule_next, then clear SCHEDULER")
+        unsafe {
+            SCHEDULER = self as *mut Scheduler
+        }
+        loop {
+            if let Some(_) = self.threads[1..].iter().find(|val| val.state != Finished){
+                self.schedule_next();
+            }else{
+                break;
+            }
+        }
+        unsafe {
+            SCHEDULER = null_mut();
+        }
     }
 
     /// Find the next ready thread (starting from `current + 1` round-robin), mark current as `Ready` (if not `Finished`), mark next as `Running`, set `CURRENT_THREAD_ENTRY` if the next thread has an entry, then switch to it.
     fn schedule_next(&mut self) {
-        todo!("round-robin find next Ready, set current Ready (if not Finished), next Running, CURRENT_THREAD_ENTRY, then switch_context")
+        // todo!("round-robin find next Ready, set current Ready (if not Finished), next Running, CURRENT_THREAD_ENTRY, then switch_context")
+        if self.threads[self.current].state != Finished { self.threads[self.current].state = Ready;}
+        
+        if let Some((val,_)) = self.threads.iter().enumerate().skip(self.current + 1).find(|(_,val)| val.state == Ready){
+            self.threads[val].state = Running;
+            if self.threads[val].entry.is_some(){
+                unsafe {CURRENT_THREAD_ENTRY = self.threads[val].entry.take()}
+            }
+            let old  = self.current;
+            self.current = val;
+            unsafe {
+                switch_context(&(*(self.threads.as_mut_ptr().add(old))).ctx as *const TaskContext as *mut TaskContext, 
+            &(*(self.threads.as_mut_ptr().add(val))).ctx as *const TaskContext
+            );
+            }
+        }else{
+            let old  = self.current;
+            self.current = 0;
+            unsafe {
+                switch_context(&(*(self.threads.as_mut_ptr().add(old))).ctx as *const TaskContext as *mut TaskContext, 
+            &(*(self.threads.as_mut_ptr())).ctx as *const TaskContext
+            );
+            }
+        }
     }
 }
 
