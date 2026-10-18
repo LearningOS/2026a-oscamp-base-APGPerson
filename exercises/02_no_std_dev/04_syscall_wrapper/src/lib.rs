@@ -93,12 +93,14 @@ pub unsafe fn syscall3(id: usize, arg0: usize, arg1: usize, arg2: usize) -> isiz
     //   - inlateout("rax") id => ret
     //   - in("rdi") arg0, in("rsi") arg1, in("rdx") arg2
     //   - out("rcx") _, out("r11") _
+    let ret: isize;
     core::arch::asm!(
-        "syscall" instruction,
-        inlateout("rax") id => ret,
+        "syscall",
+        inlateout("rax") id as isize => ret,
         in("rdi") arg0, in("rsi") arg1, in("rdx") arg2,
         out("rcx") _, out("r11") _,
-    )
+    );
+    ret
 }
 
 #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
@@ -109,12 +111,14 @@ pub unsafe fn syscall3(id: usize, arg0: usize, arg1: usize, arg2: usize) -> isiz
     //   - in("x8") id
     //   - inlateout("x0") arg0 => ret
     //   - in("x1") arg1, in("x2") arg2
+    let ret: isize;
     core::arch::asm!(
         "svc #0",
         in("x8") id,
-        inlateout("x0") arg0 => ret,
+        inlateout("x0") arg0 as isize => ret,
         in("x1") arg1, in("x2") arg2,
-    )
+    );
+    ret
 }
 
 // Non-Linux platforms: provide a stub so the code compiles
