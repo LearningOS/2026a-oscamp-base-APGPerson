@@ -2,8 +2,8 @@
   "schema": 1,
   "courseId": 2074,
   "repository": "LearningOS/2026a-oscamp-base-APGPerson",
-  "commit": "f1a68501b0bbd118a864394a1295cad16943b0d7",
-  "score": 95,
+  "commit": "34c164742e7378cd1cffb268c169a8b91c6877e1",
+  "score": 100,
   "totalScore": 100,
   "exercises": [
     {
@@ -58,9 +58,9 @@
     {
       "name": "syscall_wrapper",
       "max": 5,
-      "score": 0,
-      "status": "fail",
-      "exitCode": 101
+      "score": 5,
+      "status": "pass",
+      "exitCode": 0
     },
     {
       "name": "fd_table",
@@ -176,9 +176,9 @@
     }
   ],
   "student": "APGPerson",
-  "runId": "39122219668",
+  "runId": "39123073424",
   "runAttempt": "1",
   "upload": {
-    "status": "accepted"
+    "status": "pending"
   }
 }
