@@ -2,7 +2,7 @@
   "schema": 1,
   "courseId": 2074,
   "repository": "LearningOS/2026a-oscamp-base-APGPerson",
-  "commit": "34c164742e7378cd1cffb268c169a8b91c6877e1",
+  "commit": "3797c6c428b110d97efe0fd1f9ea163688ea7449",
   "score": 100,
   "totalScore": 100,
   "exercises": [
@@ -176,9 +176,9 @@
     }
   ],
   "student": "APGPerson",
-  "runId": "39123073424",
+  "runId": "39192486442",
   "runAttempt": "1",
   "upload": {
-    "status": "accepted"
+    "status": "pending"
   }
 }
